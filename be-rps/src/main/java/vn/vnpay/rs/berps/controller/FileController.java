@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController()
 @RequestMapping("/v1/file")
 public class FileController {
+    @PostMapping(value ="/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public boolean upload() {
+        return true;
+    }
+
     @PostMapping(value ="/upload/chunk", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public boolean uploadChunk() {
         return true;

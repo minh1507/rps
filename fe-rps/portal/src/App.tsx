@@ -1,22 +1,28 @@
 import { useState } from 'react';
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
+import './App.css';
 
 interface ChunkUploadProps {
   chunkSizeMB?: number;
 }
 
 const App: React.FC<ChunkUploadProps> = ({ chunkSizeMB = 5 }) => {
-  const [progress, setProgress] = useState<number>(0);
-  const [status, setStatus] = useState<string>("");
+  // --- Chunked Upload State ---
+  const [chunkProgress, setChunkProgress] = useState<number>(0);
+  const [chunkStatus, setChunkStatus] = useState<string>("");
 
-  // Hàm upload 1 chunk
+  // --- Regular Upload State ---
+  const [regularProgress, setRegularProgress] = useState<number>(0);
+  const [regularStatus, setRegularStatus] = useState<string>("");
+
+  // --- Chunked upload ---
   const uploadChunk = async (
-    fileId: string,
-    file: File,
-    chunkIndex: number,
-    chunkSize: number,
-    totalChunks: number
+      fileId: string,
+      file: File,
+      chunkIndex: number,
+      chunkSize: number,
+      totalChunks: number
   ) => {
     const start = chunkIndex * chunkSize;
     const end = Math.min(file.size, start + chunkSize);
@@ -37,8 +43,8 @@ const App: React.FC<ChunkUploadProps> = ({ chunkSizeMB = 5 }) => {
           headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (event) => {
             const total = event.total ?? blob.size;
-            const chunkProgress = (event.loaded / total) / totalChunks;
-            setProgress(((chunkIndex / totalChunks) + chunkProgress) * 100);
+            const chunkProg = (event.loaded / total) / totalChunks;
+            setChunkProgress(((chunkIndex / totalChunks) + chunkProg) * 100);
           },
         });
         success = true;
@@ -50,47 +56,94 @@ const App: React.FC<ChunkUploadProps> = ({ chunkSizeMB = 5 }) => {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleChunkedUpload = async (file: File) => {
     const chunkSize = chunkSizeMB * 1024 * 1024;
     const totalChunks = Math.ceil(file.size / chunkSize);
     const fileId = uuidv4();
 
-    setProgress(0);
-    setStatus("Uploading...");
+    setChunkProgress(0);
+    setChunkStatus("Uploading in chunks...");
 
     try {
-      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-        await uploadChunk(fileId, file, chunkIndex, chunkSize, totalChunks);
+      for (let i = 0; i < totalChunks; i++) {
+        await uploadChunk(fileId, file, i, chunkSize, totalChunks);
       }
 
-      // Gọi API BE merge khi upload xong tất cả chunk
       await axios.post("http://localhost:8080/v1/file/upload/chunk/complete", {
         fileId,
         fileName: file.name,
         totalChunks,
       });
 
-      setProgress(100);
-      setStatus("Upload completed!");
+      setChunkProgress(100);
+      setChunkStatus("Chunk upload completed!");
     } catch (err) {
       console.error(err);
-      setStatus("Error uploading file");
+      setChunkStatus("Error uploading file in chunks");
+    }
+  };
+
+  // --- Regular upload ---
+  const handleRegularUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+
+    setRegularProgress(0);
+    setRegularStatus("Uploading whole file...");
+
+    try {
+      await axios.post("http://localhost:8080/v1/file/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (event) => {
+          const total = event.total ?? file.size;
+          setRegularProgress((event.loaded / total) * 100);
+        },
+      });
+
+      setRegularProgress(100);
+      setRegularStatus("Regular upload completed!");
+    } catch (err) {
+      console.error(err);
+      setRegularStatus("Error uploading file");
     }
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "500px" }}>
-      <input type="file" onChange={handleFileChange} />
-      <div style={{ marginTop: "10px" }}>
-        <strong>Progress:</strong> {progress.toFixed(2)}%
+      <div className="app-container">
+        {/* --- Chunk Upload Card --- */}
+        <div className="card">
+          <h3>Chunk Upload</h3>
+          <input
+              type="file"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) await handleChunkedUpload(file);
+              }}
+          />
+          <div className="progress-container">
+            <div className="progress-bar" style={{ width: `${chunkProgress}%` }}></div>
+          </div>
+          <div className="status-text">{chunkStatus}</div>
+          <div className="status-text">{chunkProgress.toFixed(2)}%</div>
+        </div>
+
+        {/* --- Regular Upload Card --- */}
+        <div className="card">
+          <h3>Regular Upload</h3>
+          <input
+              type="file"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) await handleRegularUpload(file);
+              }}
+          />
+          <div className="progress-container">
+            <div className="progress-bar" style={{ width: `${regularProgress}%` }}></div>
+          </div>
+          <div className="status-text">{regularStatus}</div>
+          <div className="status-text">{regularProgress.toFixed(2)}%</div>
+        </div>
       </div>
-      <div style={{ marginTop: "5px" }}>
-        <strong>Status:</strong> {status}
-      </div>
-    </div>
   );
 };
 
