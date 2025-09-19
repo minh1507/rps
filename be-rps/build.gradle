@@ -23,6 +23,16 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    implementation 'io.minio:minio:8.5.7'
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    implementation 'software.amazon.awssdk:s3:2.25.54'
+    implementation 'software.amazon.awssdk:auth:2.25.54'
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 }
 
 tasks.named('test') {
